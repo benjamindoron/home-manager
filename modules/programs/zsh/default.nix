@@ -482,20 +482,30 @@ in
           ];
 
           warnings =
-            lib.optionals
-              (cfg.dotDir != homeDir && !lib.hasPrefix "/" cfg.dotDir && !lib.hasInfix "$" cfg.dotDir)
-              [
-                ''
-                  Using relative paths in programs.zsh.dotDir is deprecated and will be removed in a future release.
-                  Current dotDir: ${cfg.dotDir}
-                  Consider using absolute paths or home-manager config options instead.
-                  You can replace relative paths or environment variables with options like:
-                  - config.home.homeDirectory (user's home directory)
-                  - config.xdg.configHome (XDG config directory)
-                  - config.xdg.dataHome (XDG data directory)
-                  - config.xdg.cacheHome (XDG cache directory)
-                ''
-              ]
+            config.lib.shell.selfReferenceWarnings {
+              option = options.programs.zsh.sessionVariables;
+              optionPath = "programs.zsh.sessionVariables";
+              rationale = ''
+                Zsh session variables are re-applied for each new Zsh process,
+                so a value that includes its own previous contents grows with
+                every nested shell.
+              '';
+            }
+            ++
+              lib.optionals
+                (cfg.dotDir != homeDir && !lib.hasPrefix "/" cfg.dotDir && !lib.hasInfix "$" cfg.dotDir)
+                [
+                  ''
+                    Using relative paths in programs.zsh.dotDir is deprecated and will be removed in a future release.
+                    Current dotDir: ${cfg.dotDir}
+                    Consider using absolute paths or home-manager config options instead.
+                    You can replace relative paths or environment variables with options like:
+                    - config.home.homeDirectory (user's home directory)
+                    - config.xdg.configHome (XDG config directory)
+                    - config.xdg.dataHome (XDG data directory)
+                    - config.xdg.cacheHome (XDG cache directory)
+                  ''
+                ]
             ++
               lib.optionals
                 (

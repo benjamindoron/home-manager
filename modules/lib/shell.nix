@@ -117,9 +117,89 @@ let
         unset ${lib.concatStringsSep " " mergeScratchVariables}
       '';
 
+  /*
+    Best-effort check whether a session variable value references the variable
+    it defines, such as `PATH = "$HOME/bin:$PATH"`. Such a value gains a copy
+    of its previous contents every time the session variables file is applied
+    in a new shell.
+
+    Detects the direct forms `$NAME`, `''${NAME}` and `''${NAME:-...}`.
+    Backslash escapes are honoured, so `\$NAME` is ignored while `\\$NAME`
+    still counts, and `$$NAME` is the shell PID followed by literal text.
+    Indirect forms, through `eval` or another variable, are not detected.
+
+    A value that is exactly one default, alternate, or assign expansion of its
+    own name, such as `''${NAME:-fallback}`, reaches a fixed point on the first
+    application and is therefore not reported.
+
+    # Type
+
+    ```
+    isSelfReferential :: String -> Any -> Bool
+    ```
+  */
+  isSelfReferential =
+    name: value:
+    lib.isString value
+    && (
+      let
+        # `\x` never expands and `$$` is the shell PID, so neither can start a
+        # reference; strip them before looking for `$NAME`.
+        plainParts = lib.filter lib.isString (builtins.split ''(\\.|[$][$])'' value);
+        refers = part: builtins.match ".*[$][{]?${lib.escapeRegex name}([^A-Za-z0-9_].*)?" part != null;
+        # The fallback word may itself contain a braced expansion, as in
+        # ${NAME:-${HOME}/bin}, so allow one level of nesting there.
+        converging =
+          builtins.match "[$][{]${lib.escapeRegex name}:?[-+=?]([^{}]|[$][{][^{}]*[}])*[}]" value != null;
+      in
+      !converging && lib.any refers plainParts
+    );
+
+  /*
+    Build the warning list for self-referential entries of a session-variable
+    option. Shared so every shell that has its own `sessionVariables` reports
+    the same thing.
+
+    # Type
+
+    ```
+    selfReferenceWarnings :: { option, optionPath, rationale } -> [ String ]
+    ```
+  */
+  selfReferenceWarnings =
+    {
+      option,
+      optionPath,
+      rationale,
+    }:
+    let
+      offenders = lib.attrNames (lib.filterAttrs isSelfReferential option.value);
+    in
+    lib.optional (offenders != [ ]) ''
+      The following ${optionPath} reference themselves:
+
+        ${lib.concatStringsSep ", " offenders}
+
+      ${lib.removeSuffix "\n" rationale}
+
+      Use home.sessionPath, home.sessionSearchVariables, or
+      home.sessionSearchVariablesAppend for search paths instead. Those add
+      only the entries that are missing.
+
+      Defined in ${lib.options.showFiles option.files}.
+
+      This check is best-effort: only direct references such as $NAME,
+      ''${NAME} and ''${NAME:-...} are detected.
+    '';
+
 in
 {
-  inherit export wrapLines;
+  inherit
+    export
+    wrapLines
+    isSelfReferential
+    selfReferenceWarnings
+    ;
 
   /**
     Generate a complete POSIX shell block that merges entries into
