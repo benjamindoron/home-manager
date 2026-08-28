@@ -29,13 +29,19 @@ let
   candidateNames = lib.concatMap (merge: map (candidate: candidate.name) merge.candidates) merges;
 
   prelude = pkgs.writeText "hm-session-vars-fish-prelude.sh" ''
-    if [ -n "''${__HM_SESS_VARS_SOURCED-}" ]; then return; fi
-    export __HM_SESS_VARS_SOURCED=1
-
     ${shell.exportAll config.home.sessionVariables}
   '';
 
-  extra = pkgs.writeText "hm-session-vars-fish-extra.sh" config.home.sessionVariablesExtra;
+  # Arbitrary code, so it keeps the once-per-session guard that the rest of
+  # the file no longer needs.
+  extra = pkgs.writeText "hm-session-vars-fish-extra.sh" (
+    lib.optionalString (config.home.sessionVariablesExtra != "") ''
+      if [ -z "''${__HM_SESS_VARS_SOURCED-}" ]; then
+        export __HM_SESS_VARS_SOURCED=1
+      ${config.home.sessionVariablesExtra}
+      fi
+    ''
+  );
 
   # Translate assignments and calls together so an entry can observe earlier
   # search-variable merges. The helper itself remains native Fish.

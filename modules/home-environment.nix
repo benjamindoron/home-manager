@@ -360,6 +360,12 @@ in
       description = ''
         The package containing the
         {file}`hm-session-vars.sh` file.
+
+        The file is safe to apply more than once. Plain variables are
+        re-exported and search variables add only missing entries, so a new
+        shell picks up the current generation's values.
+        [](#opt-home.sessionVariablesExtra) is guarded to run once per
+        session.
       '';
     };
 
@@ -706,11 +712,9 @@ in
         option = options.home.sessionVariables;
         optionPath = "home.sessionVariables";
         rationale = ''
-          A value that includes its own previous contents gains another copy
-          each time it is applied. Home Manager only applies the session
-          variables file once per session today, so this is currently
-          harmless, but it is the reason the file cannot safely be applied
-          again in a new shell.
+          The session variables file is applied in each new shell, so a value
+          that includes its own previous contents gains another copy every
+          time.
         '';
       };
 
@@ -757,13 +761,30 @@ in
           };
         in
         mkSections [
-          ''
-            # Only source this once.
-            if [ -n "''${__HM_SESS_VARS_SOURCED-}" ]; then return; fi
-            export __HM_SESS_VARS_SOURCED=1''
           (config.lib.shell.exportAll cfg.sessionVariables)
           searchSection
-          cfg.sessionVariablesExtra
+          # `sessionVariablesExtra` is arbitrary module and user code that
+          # cannot be assumed idempotent, so it keeps the once-per-session
+          # guard that the rest of the file no longer needs.
+          (lib.optionalString (cfg.sessionVariablesExtra != "") (
+            let
+              body = lib.removeSuffix "\n" cfg.sessionVariablesExtra;
+            in
+            # Wrapped, never rewritten. Indenting arbitrary shell would move a
+            # heredoc terminator and break parsing.
+            ''
+              if [ -z "''${__HM_SESS_VARS_SOURCED-}" ]; then
+              export __HM_SESS_VARS_SOURCED=1
+            ''
+            + body
+            # `types.lines` does not promise a trailing newline, so `fi` needs
+            # one of its own. A body ending in a backslash would then splice
+            # `fi` onto its last line, so give the continuation an empty line
+            # to end on. The `removeSuffix` above only keeps the common case
+            # free of a blank line.
+            + lib.optionalString (lib.hasSuffix "\\" body) "\n"
+            + "\nfi"
+          ))
         ];
     };
 

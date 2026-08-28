@@ -425,9 +425,11 @@ in
         # Environment variables
         . "${config.home.sessionVariablesPackage}/etc/profile.d/hm-session-vars.sh"
 
-        # Only source this once
+        # Re-apply Zsh-specific values once per Zsh process, after the
+        # generic file. Not exported: a nested Zsh must apply them too, or it
+        # would keep whatever the parent had.
         if [[ -z "''${__HM_ZSH_SESS_VARS_SOURCED-}" ]]; then
-          export __HM_ZSH_SESS_VARS_SOURCED=1
+          __HM_ZSH_SESS_VARS_SOURCED=1
           ${envVarsStr}
         fi
       '';

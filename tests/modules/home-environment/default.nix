@@ -3,6 +3,8 @@
   home-session-search-variables = ./session-search-variables.nix;
   home-session-search-variables-append = ./session-search-variables-append.nix;
   home-session-variables = ./session-variables.nix;
+  home-session-variables-extra-continuation = ./session-variables-extra-continuation.nix;
+  home-session-variables-extra-no-newline = ./session-variables-extra-no-newline.nix;
   home-nixpkgs-release-check-pkgs = ./nixpkgs-release-check-pkgs.nix;
   home-uid-from-nixos = ./uid-from-nixos.nix;
   home-uid = ./uid.nix;
