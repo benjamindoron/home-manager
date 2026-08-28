@@ -274,6 +274,25 @@ in
       '';
 
       home.file.".bashrc".source = writeBashScript "bashrc" ''
+        # Interactive non-login shells never read .profile, so without this
+        # they keep whatever the session that started them happened to have.
+        # Login shells are skipped because .profile already did this, and
+        # non-interactive shells are skipped because bash reads .bashrc for
+        # `ssh host cmd` and writing to stdout there breaks scp and rsync.
+        #
+        # Values applied here can be overridden afterwards: bashrcExtra runs
+        # next, and initExtra runs later for interactive shells only.
+        ${lib.concatStringsSep "\n" (
+          [
+            "if [[ $- == *i* ]] && ! shopt -q login_shell; then"
+            "  . \"${config.home.sessionVariablesPackage}/etc/profile.d/hm-session-vars.sh\""
+          ]
+          # Not indented: a variable value can span lines, and indenting the
+          # continuation would add the leading spaces to the value itself.
+          ++ lib.optional (sessionVarsStr != "") sessionVarsStr
+          ++ [ "fi" ]
+        )}
+
         ${cfg.bashrcExtra}
 
         # Commands that should be applied only for interactive shells.

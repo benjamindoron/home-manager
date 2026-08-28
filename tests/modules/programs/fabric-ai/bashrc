@@ -1,3 +1,15 @@
+# Interactive non-login shells never read .profile, so without this
+# they keep whatever the session that started them happened to have.
+# Login shells are skipped because .profile already did this, and
+# non-interactive shells are skipped because bash reads .bashrc for
+# `ssh host cmd` and writing to stdout there breaks scp and rsync.
+#
+# Values applied here can be overridden afterwards: bashrcExtra runs
+# next, and initExtra runs later for interactive shells only.
+if [[ $- == *i* ]] && ! shopt -q login_shell; then
+  . "/nix/store/00000000000000000000000000000000-hm-session-vars.sh/etc/profile.d/hm-session-vars.sh"
+fi
+
 
 
 # Commands that should be applied only for interactive shells.
